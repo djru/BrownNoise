@@ -1,147 +1,195 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pure Brown Noise Generator</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #121212;
-            color: #e0e0e0;
-            margin: 0;
-        }
-        .controls {
-            background: #1e1e1e;
-            padding: 2rem;
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            text-align: center;
-            width: 320px;
-        }
-        button {
-            background-color: #3d5afe;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-            margin-bottom: 20px;
-            width: 100%;
-            transition: background 0.2s;
-        }
-        button:hover { background-color: #536dfe; }
-        button.playing { background-color: #f44336; }
-        
-        .slider-group {
-            margin: 15px 0;
-            text-align: left;
-        }
-        label { display: block; margin-bottom: 8px; font-size: 0.9rem; opacity: 0.8; }
-        input[type=range] { width: 100%; cursor: pointer; }
-    </style>
-</head>
-<body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Pure Brown Noise Generator</title>
+        <style>
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Helvetica, Arial, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                background-color: #121212;
+                color: #e0e0e0;
+                margin: 0;
+            }
+            .controls {
+                background: #1e1e1e;
+                padding: 2rem;
+                border-radius: 16px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                text-align: center;
+                width: 320px;
+            }
+            button {
+                background-color: #3d5afe;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 1rem;
+                cursor: pointer;
+                margin-bottom: 20px;
+                width: 100%;
+                transition: background 0.2s;
+            }
+            button:hover {
+                background-color: #536dfe;
+            }
+            button.playing {
+                background-color: #f44336;
+            }
 
-    <div class="controls">
-        <h2>Brown Noise</h2>
-        <button id="playBtn">Start Pure Noise</button>
-        
-        <div class="slider-group">
-            <label id="freqLabel">Deepness (Cutoff): 400Hz</label>
-            <input type="range" id="freqSlider" min="100" max="2000" step="10" value="400">
+            .slider-group {
+                margin: 15px 0;
+                text-align: left;
+            }
+            label {
+                display: block;
+                margin-bottom: 8px;
+                font-size: 0.9rem;
+                opacity: 0.8;
+            }
+            input[type="range"] {
+                width: 100%;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="controls">
+            <h2>Brown Noise</h2>
+            <button id="playBtn">Start Pure Noise</button>
+
+            <div class="slider-group">
+                <label id="freqLabel">Deepness (Cutoff): 240Hz</label>
+                <input
+                    type="range"
+                    id="freqSlider"
+                    min="100"
+                    max="600"
+                    step="10"
+                    value="240"
+                />
+            </div>
+
+            <div class="slider-group">
+                <label>Volume</label>
+                <input
+                    type="range"
+                    id="volumeSlider"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value="0.5"
+                />
+            </div>
         </div>
 
-        <div class="slider-group">
-            <label>Volume</label>
-            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.5">
-        </div>
-    </div>
+        <script>
+            let audioCtx;
+            let noiseSource;
+            let filterNode;
+            let gainNode;
+            let isPlaying = false;
 
-    <script>
-        let audioCtx;
-        let noiseSource;
-        let filterNode;
-        let gainNode;
-        let isPlaying = false;
+            const playBtn = document.getElementById("playBtn");
+            const freqSlider = document.getElementById("freqSlider");
+            const volumeSlider = document.getElementById("volumeSlider");
+            const freqLabel = document.getElementById("freqLabel");
 
-        const playBtn = document.getElementById('playBtn');
-        const freqSlider = document.getElementById('freqSlider');
-        const volumeSlider = document.getElementById('volumeSlider');
-        const freqLabel = document.getElementById('freqLabel');
+            function initAudio() {
+                audioCtx = new (
+                    window.AudioContext || window.webkitAudioContext
+                )();
 
-        function initAudio() {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // 1. Create a long 5-second buffer of White Noise to prevent audible loops
-            const bufferSize = 5 * audioCtx.sampleRate;
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+                // 1. Create a long 5-second buffer of White Noise to prevent audible loops
+                const bufferSize = 5 * audioCtx.sampleRate;
+                const buffer = audioCtx.createBuffer(
+                    1,
+                    bufferSize,
+                    audioCtx.sampleRate,
+                );
+                const data = buffer.getChannelData(0);
+                let lastOut = 0.0;
+                for (let i = 0; i < bufferSize; i++) {
+                    const white = Math.random() * 2 - 1; // Standard white noise component
+
+                    // The "Brown" algorithm: current = (previous + (small_random)) / adjustment
+                    // We use 0.02 as a scaling factor to keep the volume manageable
+                    lastOut = (lastOut + 0.02 * white) / 1.002;
+
+                    // Scale up the result for audible volume
+                    data[i] = lastOut * 3.5;
+                }
+
+                noiseSource = audioCtx.createBufferSource();
+                noiseSource.buffer = buffer;
+                noiseSource.loop = true;
+
+                // 2. The Filter: This is what makes it "Pure" and removes the scratchiness
+                filterNode = audioCtx.createBiquadFilter();
+                filterNode.type = "lowpass";
+                filterNode.frequency.value = freqSlider.value;
+                filterNode.Q.value = 0.5; // Low Q ensures a smooth, non-whistling drop-off
+
+                // 3. Gain Node for smooth volume control
+                gainNode = audioCtx.createGain();
+                gainNode.gain.value = volumeSlider.value;
+
+                // Connect: Source -> Filter -> Gain -> Destination
+                noiseSource.connect(filterNode);
+                filterNode.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
             }
 
-            noiseSource = audioCtx.createBufferSource();
-            noiseSource.buffer = buffer;
-            noiseSource.loop = true;
+            playBtn.addEventListener("click", () => {
+                if (!isPlaying) {
+                    if (!audioCtx) initAudio();
+                    if (audioCtx.state === "suspended") audioCtx.resume();
 
-            // 2. The Filter: This is what makes it "Pure" and removes the scratchiness
-            filterNode = audioCtx.createBiquadFilter();
-            filterNode.type = 'lowpass';
-            filterNode.frequency.value = freqSlider.value;
-            filterNode.Q.value = 0.5; // Low Q ensures a smooth, non-whistling drop-off
+                    noiseSource.start();
+                    playBtn.textContent = "Stop";
+                    playBtn.classList.add("playing");
+                    isPlaying = true;
+                } else {
+                    // To stop properly and allow restart, we disconnect or stop the source
+                    noiseSource.stop();
+                    isPlaying = false;
+                    playBtn.textContent = "Start Pure Noise";
+                    playBtn.classList.remove("playing");
+                    // Re-initialize for next play
+                    initAudio();
+                }
+            });
 
-            // 3. Gain Node for smooth volume control
-            gainNode = audioCtx.createGain();
-            gainNode.gain.value = volumeSlider.value;
+            // Real-time updates without restarting
+            freqSlider.oninput = function () {
+                const val = this.value;
+                freqLabel.textContent = `Deepness (Cutoff): ${val}Hz`;
+                if (filterNode) {
+                    // Exponential ramp makes the slider feel more natural to the ear
+                    filterNode.frequency.exponentialRampToValueAtTime(
+                        val,
+                        audioCtx.currentTime + 0.1,
+                    );
+                }
+            };
 
-            // Connect: Source -> Filter -> Gain -> Destination
-            noiseSource.connect(filterNode);
-            filterNode.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-        }
-
-        playBtn.addEventListener('click', () => {
-            if (!isPlaying) {
-                if (!audioCtx) initAudio();
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-                
-                noiseSource.start();
-                playBtn.textContent = 'Stop';
-                playBtn.classList.add('playing');
-                isPlaying = true;
-            } else {
-                // To stop properly and allow restart, we disconnect or stop the source
-                noiseSource.stop();
-                isPlaying = false;
-                playBtn.textContent = 'Start Pure Noise';
-                playBtn.classList.remove('playing');
-                // Re-initialize for next play
-                initAudio();
-            }
-        });
-
-        // Real-time updates without restarting
-        freqSlider.oninput = function() {
-            const val = this.value;
-            freqLabel.textContent = `Deepness (Cutoff): ${val}Hz`;
-            if (filterNode) {
-                // Exponential ramp makes the slider feel more natural to the ear
-                filterNode.frequency.exponentialRampToValueAtTime(val, audioCtx.currentTime + 0.1);
-            }
-        };
-
-        volumeSlider.oninput = function() {
-            if (gainNode) {
-                gainNode.gain.setTargetAtTime(this.value, audioCtx.currentTime, 0.05);
-            }
-        };
-    </script>
-</body>
+            volumeSlider.oninput = function () {
+                if (gainNode) {
+                    gainNode.gain.setTargetAtTime(
+                        this.value,
+                        audioCtx.currentTime,
+                        0.05,
+                    );
+                }
+            };
+        </script>
+    </body>
 </html>
